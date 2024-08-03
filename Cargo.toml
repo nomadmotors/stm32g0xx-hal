@@ -19,6 +19,8 @@ default-target = "thumbv6m-none-eabi"
 cortex-m = { version = "0.7.7", features = ["critical-section-single-core"] }
 nb = "1.0.0"
 fugit = "0.3.5"
+defmt = { version = "0.3.6", optional = true }
+proto-hal = { path = "/Users/adinack/Projects/proto-hal" }
 
 [dependencies.stm32g0]
 version = "0.14.0"
@@ -41,7 +43,7 @@ cortex-m-rtic = "1.0.0"
 cortex-m-semihosting = "0.3.5"
 embedded-graphics = "0.5"
 embedded-sdmmc = "0.2.1"
-infrared =  "0.11.0"
+infrared = "0.11.0"
 panic-halt = "0.2.0"
 panic-semihosting = "0.5.3"
 smart-leds = "0.3.0"
@@ -49,7 +51,7 @@ st7735-lcd = "0.6.1"
 ws2812-spi = { version = "0.3.0", features = [] }
 
 [features]
-default = ["i2c-blocking"]
+default = ["i2c-blocking", "defmt"]
 device-selected = []
 rt = ["stm32g0/rt"]
 stm32g030 = ["stm32g0/stm32g030", "stm32g0x0", "device-selected"]
@@ -64,6 +66,8 @@ stm32g0x1 = []
 
 i2c-blocking = []
 i2c-nonblocking = []
+
+defmt = ["dep:defmt", "fugit/defmt"]
 
 [profile.dev]
 incremental = false

@@ -21,10 +21,20 @@ pub struct Timer<TIM> {
     tim: TIM,
 }
 
+pub unsafe trait Channel {}
+
 pub struct Channel1;
 pub struct Channel2;
 pub struct Channel3;
 pub struct Channel4;
+
+unsafe impl Channel for Channel1 {}
+
+unsafe impl Channel for Channel2 {}
+
+unsafe impl Channel for Channel3 {}
+
+unsafe impl Channel for Channel4 {}
 
 /// System timer
 impl Timer<SYST> {

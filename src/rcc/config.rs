@@ -68,7 +68,7 @@ pub type PLLMul = u8;
 
 /// PLL config
 #[derive(Clone, Copy)]
-pub struct PllConfig {
+pub struct RawPllConfig {
     pub mux: PLLSrc,
     pub m: PLLDiv,
     pub n: PLLMul,
@@ -77,9 +77,9 @@ pub struct PllConfig {
     pub p: Option<PLLDiv>,
 }
 
-impl Default for PllConfig {
-    fn default() -> PllConfig {
-        PllConfig {
+impl Default for RawPllConfig {
+    fn default() -> RawPllConfig {
+        RawPllConfig {
             mux: PLLSrc::HSI,
             m: 1,
             n: 8,
@@ -90,9 +90,9 @@ impl Default for PllConfig {
     }
 }
 
-impl PllConfig {
-    pub fn with_hsi(m: PLLDiv, n: PLLMul, r: PLLDiv) -> PllConfig {
-        PllConfig {
+impl RawPllConfig {
+    pub fn with_hsi(m: PLLDiv, n: PLLMul, r: PLLDiv) -> RawPllConfig {
+        RawPllConfig {
             mux: PLLSrc::HSI,
             m,
             n,
@@ -100,6 +100,20 @@ impl PllConfig {
             q: None,
             p: None,
         }
+    }
+
+    pub const fn validate(self) -> PllConfig {
+        assert!(true);
+
+        PllConfig::new(self)
+    }
+}
+
+pub struct PllConfig(pub(crate) RawPllConfig);
+
+impl PllConfig {
+    pub const fn new(cfg: RawPllConfig) -> Self {
+        Self(cfg)
     }
 }
 
@@ -153,7 +167,7 @@ impl Default for Config {
     fn default() -> Config {
         Config {
             sys_mux: SysClockSrc::HSI(Prescaler::NotDivided),
-            pll_cfg: PllConfig::default(),
+            pll_cfg: RawPllConfig::default().validate(),
             ahb_psc: Prescaler::NotDivided,
             apb_psc: Prescaler::NotDivided,
         }

@@ -44,24 +44,24 @@ pub enum Event {
 }
 
 impl Event {
-    pub(crate) fn from_code(n: u8) -> Event {
+    pub(crate) fn from_code(n: u8) -> Self {
         match n {
-            0 => Event::GPIO0,
-            1 => Event::GPIO1,
-            2 => Event::GPIO2,
-            3 => Event::GPIO3,
-            4 => Event::GPIO4,
-            5 => Event::GPIO5,
-            6 => Event::GPIO6,
-            7 => Event::GPIO7,
-            8 => Event::GPIO8,
-            9 => Event::GPIO9,
-            10 => Event::GPIO10,
-            11 => Event::GPIO11,
-            12 => Event::GPIO12,
-            13 => Event::GPIO13,
-            14 => Event::GPIO14,
-            15 => Event::GPIO15,
+            0 => Self::GPIO0,
+            1 => Self::GPIO1,
+            2 => Self::GPIO2,
+            3 => Self::GPIO3,
+            4 => Self::GPIO4,
+            5 => Self::GPIO5,
+            6 => Self::GPIO6,
+            7 => Self::GPIO7,
+            8 => Self::GPIO8,
+            9 => Self::GPIO9,
+            10 => Self::GPIO10,
+            11 => Self::GPIO11,
+            12 => Self::GPIO12,
+            13 => Self::GPIO13,
+            14 => Self::GPIO14,
+            15 => Self::GPIO15,
             _ => unreachable!(),
         }
     }
@@ -82,6 +82,15 @@ pub trait ExtiExt {
     fn unpend(&self, ev: Event);
 }
 
+pub trait ExtiPin {
+    type Output;
+
+    /// Configures the pin as external trigger
+    fn listen(self, edge: SignalEdge, exti: &mut EXTI) -> Self::Output;
+    /// Get the corresponding EXTI Event variant for this pin.
+    fn event(&self) -> Event;
+}
+
 impl ExtiExt for EXTI {
     fn listen(&self, ev: Event, edge: SignalEdge) {
         let line = ev as u8;
@@ -94,7 +103,7 @@ impl ExtiExt for EXTI {
             SignalEdge::Falling => {
                 self.ftsr1.modify(|r, w| unsafe { w.bits(r.bits() | mask) });
             }
-            SignalEdge::All => {
+            SignalEdge::Any => {
                 self.rtsr1.modify(|r, w| unsafe { w.bits(r.bits() | mask) });
                 self.ftsr1.modify(|r, w| unsafe { w.bits(r.bits() | mask) });
             }
@@ -168,7 +177,7 @@ impl ExtiExt for EXTI {
         match edge {
             SignalEdge::Rising => self.rpr1.read().bits() & mask != 0,
             SignalEdge::Falling => self.fpr1.read().bits() & mask != 0,
-            SignalEdge::All => {
+            SignalEdge::Any => {
                 (self.rpr1.read().bits() & mask != 0) || (self.fpr1.read().bits() & mask != 0)
             }
         }

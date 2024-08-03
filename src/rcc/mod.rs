@@ -14,6 +14,7 @@ pub const HSI_FREQ: u32 = 16_000_000;
 
 /// Clock frequencies
 #[derive(Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Clocks {
     /// System frequency
     pub sys_clk: Hertz,
@@ -31,6 +32,7 @@ pub struct Clocks {
 
 /// PLL Clock frequencies
 #[derive(Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct PLLClocks {
     /// R frequency
     pub r: Hertz,
@@ -207,10 +209,7 @@ impl Rcc {
         }
     }
 
-    fn config_pll(&self, pll_cfg: PllConfig) -> PLLClocks {
-        assert!(pll_cfg.m > 0 && pll_cfg.m <= 8);
-        assert!(pll_cfg.r > 1 && pll_cfg.r <= 8);
-
+    fn config_pll(&self, PllConfig(pll_cfg): PllConfig) -> PLLClocks {
         // If the system is currently clocked from the PLL, then switch back to
         // the HSI before we disable the PLL, otherwise the PLL will refuse to
         // switch off.

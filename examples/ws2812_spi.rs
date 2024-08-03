@@ -11,7 +11,7 @@ extern crate panic_halt;
 extern crate stm32g0xx_hal as hal;
 
 use hal::prelude::*;
-use hal::rcc::{self, PllConfig};
+use hal::rcc::{self, RawPllConfig};
 use hal::spi;
 use hal::stm32;
 use rt::entry;
@@ -24,7 +24,7 @@ fn main() -> ! {
     let cp = cortex_m::Peripherals::take().expect("cannot take core peripherals");
 
     // Configure APB bus clock to 48MHz, cause ws2812 requires 3Mbps SPI
-    let pll_cfg = PllConfig::with_hsi(4, 24, 2);
+    let pll_cfg = RawPllConfig::with_hsi(4, 24, 2);
     let rcc_cfg = rcc::Config::pll().pll_cfg(pll_cfg);
     let mut rcc = dp.RCC.freeze(rcc_cfg);
 

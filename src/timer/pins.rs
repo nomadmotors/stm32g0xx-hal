@@ -3,8 +3,14 @@ use crate::gpio::{AltFunction, DefaultMode};
 use crate::stm32::*;
 use crate::timer::*;
 
+pub mod polarity {
+    pub struct Normal;
+    pub struct Complementary;
+}
+
 pub trait TimerPin<TIM> {
-    type Channel;
+    type Channel: Channel;
+    type Polarity;
 
     fn setup(&self);
     fn release(self) -> Self;
@@ -28,10 +34,11 @@ impl<TIM, PIN: TimerPin<TIM>> TriggerPin<TIM, PIN> {
 }
 
 macro_rules! timer_pins {
-    ($TIMX:ident, [ $(($ch:ty, $pin:tt, $af_mode:expr),)+ ]) => {
+    ($TIMX:ident, [ $(($ch:ty, $pol:ty, $pin:tt, $af_mode:expr),)+ ]) => {
         $(
             impl TimerPin<$TIMX> for $pin<Analog> {
                 type Channel = $ch;
+                type Polarity = $pol;
 
                 fn setup(&self) {
                     self.set_alt_mode($af_mode);
@@ -44,6 +51,7 @@ macro_rules! timer_pins {
 
             impl TimerPin<$TIMX> for $pin<Output<OpenDrain>> {
                 type Channel = $ch;
+                type Polarity = $pol;
 
                 fn setup(&self) {
                     self.set_alt_mode($af_mode);
@@ -66,7 +74,7 @@ macro_rules! trigger_pins {
                     TimerPin::<$TIMX>::setup(&pin);
                     let tim = unsafe { &(*$TIMX::ptr()) };
                     let ts = match edge {
-                        SignalEdge::All => 0b100,
+                        SignalEdge::Any => 0b100,
                         SignalEdge::Falling => {
                             tim.ccer.modify(|_, w| w.$ccp().set_bit());
                             0b101
@@ -130,16 +138,16 @@ trigger_pins!(TIM3, [
 timer_pins!(
     TIM1,
     [
-        (Channel1, PA8, AltFunction::AF2),
-        (Channel1, PC8, AltFunction::AF2),
-        (Channel2, PA9, AltFunction::AF2),
-        (Channel2, PB3, AltFunction::AF1),
-        (Channel2, PC9, AltFunction::AF2),
-        (Channel3, PA10, AltFunction::AF2),
-        (Channel3, PB6, AltFunction::AF1),
-        (Channel3, PC10, AltFunction::AF2),
-        (Channel4, PA11, AltFunction::AF2),
-        (Channel4, PC11, AltFunction::AF2),
+        (Channel1, polarity::Normal, PA8, AltFunction::AF2),
+        (Channel1, polarity::Normal, PC8, AltFunction::AF2),
+        (Channel2, polarity::Normal, PA9, AltFunction::AF2),
+        (Channel2, polarity::Normal, PB3, AltFunction::AF1),
+        (Channel2, polarity::Normal, PC9, AltFunction::AF2),
+        (Channel3, polarity::Normal, PA10, AltFunction::AF2),
+        (Channel3, polarity::Normal, PB6, AltFunction::AF1),
+        (Channel3, polarity::Normal, PC10, AltFunction::AF2),
+        (Channel4, polarity::Normal, PA11, AltFunction::AF2),
+        (Channel4, polarity::Normal, PC11, AltFunction::AF2),
     ]
 );
 
@@ -147,15 +155,15 @@ timer_pins!(
 timer_pins!(
     TIM1,
     [
-        (Channel1, PA7, AltFunction::AF2),
-        (Channel1, PB13, AltFunction::AF2),
-        (Channel1, PD2, AltFunction::AF2),
-        (Channel2, PB0, AltFunction::AF2),
-        (Channel2, PB14, AltFunction::AF2),
-        (Channel2, PD3, AltFunction::AF2),
-        (Channel3, PB1, AltFunction::AF2),
-        (Channel3, PB15, AltFunction::AF2),
-        (Channel3, PD4, AltFunction::AF2),
+        (Channel1, polarity::Complementary, PA7, AltFunction::AF2),
+        (Channel1, polarity::Complementary, PB13, AltFunction::AF2),
+        (Channel1, polarity::Complementary, PD2, AltFunction::AF2),
+        (Channel2, polarity::Complementary, PB0, AltFunction::AF2),
+        (Channel2, polarity::Complementary, PB14, AltFunction::AF2),
+        (Channel2, polarity::Complementary, PD3, AltFunction::AF2),
+        (Channel3, polarity::Complementary, PB1, AltFunction::AF2),
+        (Channel3, polarity::Complementary, PB15, AltFunction::AF2),
+        (Channel3, polarity::Complementary, PD4, AltFunction::AF2),
     ]
 );
 
@@ -163,46 +171,46 @@ timer_pins!(
 timer_pins!(
     TIM2,
     [
-        (Channel1, PA0, AltFunction::AF2),
-        (Channel1, PA5, AltFunction::AF2),
-        (Channel1, PA15, AltFunction::AF2),
-        (Channel1, PC4, AltFunction::AF2),
-        (Channel2, PA1, AltFunction::AF2),
-        (Channel2, PB3, AltFunction::AF2),
-        (Channel2, PC5, AltFunction::AF2),
-        (Channel3, PA2, AltFunction::AF2),
-        (Channel3, PB10, AltFunction::AF2),
-        (Channel3, PC6, AltFunction::AF2),
-        (Channel4, PA3, AltFunction::AF2),
-        (Channel4, PB11, AltFunction::AF2),
-        (Channel4, PC7, AltFunction::AF2),
+        (Channel1, polarity::Normal, PA0, AltFunction::AF2),
+        (Channel1, polarity::Normal, PA5, AltFunction::AF2),
+        (Channel1, polarity::Normal, PA15, AltFunction::AF2),
+        (Channel1, polarity::Normal, PC4, AltFunction::AF2),
+        (Channel2, polarity::Normal, PA1, AltFunction::AF2),
+        (Channel2, polarity::Normal, PB3, AltFunction::AF2),
+        (Channel2, polarity::Normal, PC5, AltFunction::AF2),
+        (Channel3, polarity::Normal, PA2, AltFunction::AF2),
+        (Channel3, polarity::Normal, PB10, AltFunction::AF2),
+        (Channel3, polarity::Normal, PC6, AltFunction::AF2),
+        (Channel4, polarity::Normal, PA3, AltFunction::AF2),
+        (Channel4, polarity::Normal, PB11, AltFunction::AF2),
+        (Channel4, polarity::Normal, PC7, AltFunction::AF2),
     ]
 );
 
 timer_pins!(
     TIM3,
     [
-        (Channel1, PA6, AltFunction::AF1),
-        (Channel1, PB4, AltFunction::AF1),
-        (Channel1, PC6, AltFunction::AF1),
-        (Channel2, PA7, AltFunction::AF1),
-        (Channel2, PB5, AltFunction::AF1),
-        (Channel2, PC7, AltFunction::AF1),
-        (Channel3, PB0, AltFunction::AF1),
-        (Channel3, PC8, AltFunction::AF1),
-        (Channel4, PB1, AltFunction::AF1),
-        (Channel4, PC9, AltFunction::AF1),
+        (Channel1, polarity::Normal, PA6, AltFunction::AF1),
+        (Channel1, polarity::Normal, PB4, AltFunction::AF1),
+        (Channel1, polarity::Normal, PC6, AltFunction::AF1),
+        (Channel2, polarity::Normal, PA7, AltFunction::AF1),
+        (Channel2, polarity::Normal, PB5, AltFunction::AF1),
+        (Channel2, polarity::Normal, PC7, AltFunction::AF1),
+        (Channel3, polarity::Normal, PB0, AltFunction::AF1),
+        (Channel3, polarity::Normal, PC8, AltFunction::AF1),
+        (Channel4, polarity::Normal, PB1, AltFunction::AF1),
+        (Channel4, polarity::Normal, PC9, AltFunction::AF1),
     ]
 );
 
 timer_pins!(
     TIM14,
     [
-        (Channel1, PA4, AltFunction::AF4),
-        (Channel1, PA7, AltFunction::AF4),
-        (Channel1, PB1, AltFunction::AF0),
-        (Channel1, PC12, AltFunction::AF2),
-        (Channel1, PF0, AltFunction::AF2),
+        (Channel1, polarity::Normal, PA4, AltFunction::AF4),
+        (Channel1, polarity::Normal, PA7, AltFunction::AF4),
+        (Channel1, polarity::Normal, PB1, AltFunction::AF0),
+        (Channel1, polarity::Normal, PC12, AltFunction::AF2),
+        (Channel1, polarity::Normal, PF0, AltFunction::AF2),
     ]
 );
 
@@ -210,12 +218,12 @@ timer_pins!(
 timer_pins!(
     TIM15,
     [
-        (Channel1, PA2, AltFunction::AF5),
-        (Channel1, PB14, AltFunction::AF5),
-        (Channel1, PC1, AltFunction::AF2),
-        (Channel2, PA3, AltFunction::AF5),
-        (Channel2, PB15, AltFunction::AF5),
-        (Channel2, PC2, AltFunction::AF2),
+        (Channel1, polarity::Normal, PA2, AltFunction::AF5),
+        (Channel1, polarity::Normal, PB14, AltFunction::AF5),
+        (Channel1, polarity::Normal, PC1, AltFunction::AF2),
+        (Channel2, polarity::Normal, PA3, AltFunction::AF5),
+        (Channel2, polarity::Normal, PB15, AltFunction::AF5),
+        (Channel2, polarity::Normal, PC2, AltFunction::AF2),
     ]
 );
 
@@ -224,32 +232,38 @@ timer_pins!(
 timer_pins!(
     TIM15,
     [
-        (Channel1, PA1, AltFunction::AF5),
-        (Channel1, PB13, AltFunction::AF5),
-        (Channel1, PF1, AltFunction::AF2),
+        (Channel1, polarity::Complementary, PA1, AltFunction::AF5),
+        (Channel1, polarity::Complementary, PB13, AltFunction::AF5),
+        (Channel1, polarity::Complementary, PF1, AltFunction::AF2),
     ]
 );
 
 timer_pins!(
     TIM16,
     [
-        (Channel1, PA6, AltFunction::AF5),
-        (Channel1, PB8, AltFunction::AF2),
-        (Channel1, PD0, AltFunction::AF2),
+        (Channel1, polarity::Normal, PA6, AltFunction::AF5),
+        (Channel1, polarity::Normal, PB8, AltFunction::AF2),
+        (Channel1, polarity::Normal, PD0, AltFunction::AF2),
     ]
 );
 
 // Inverted pins
-timer_pins!(TIM16, [(Channel1, PB6, AltFunction::AF2),]);
+timer_pins!(
+    TIM16,
+    [(Channel1, polarity::Complementary, PB6, AltFunction::AF2),]
+);
 
 timer_pins!(
     TIM17,
     [
-        (Channel1, PA7, AltFunction::AF6),
-        (Channel1, PB9, AltFunction::AF2),
-        (Channel1, PD1, AltFunction::AF2),
+        (Channel1, polarity::Normal, PA7, AltFunction::AF6),
+        (Channel1, polarity::Normal, PB9, AltFunction::AF2),
+        (Channel1, polarity::Normal, PD1, AltFunction::AF2),
     ]
 );
 
 //  Inverted pins
-timer_pins!(TIM17, [(Channel1, PB7, AltFunction::AF2),]);
+timer_pins!(
+    TIM17,
+    [(Channel1, polarity::Complementary, PB7, AltFunction::AF2),]
+);

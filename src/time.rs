@@ -5,6 +5,7 @@ pub use fugit::{
 
 /// Baudrate
 #[derive(Debug, Eq, PartialEq, PartialOrd, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Bps(pub u32);
 
 /// A measurement of a monotonically nondecreasing clock

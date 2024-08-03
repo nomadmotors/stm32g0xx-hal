@@ -9,7 +9,7 @@ extern crate panic_halt;
 extern crate stm32g0xx_hal as hal;
 
 use cortex_m_semihosting::hprintln;
-use hal::analog::adc::{OversamplingRatio, Precision, SampleTime, VBat};
+use hal::analog::adc::{OversamplingRatio, Precision, SampleTime, SampleTimeSelect, VBat};
 use hal::prelude::*;
 use hal::stm32;
 use rt::entry;
@@ -24,8 +24,8 @@ fn main() -> ! {
     let gpioa = dp.GPIOA.split(&mut rcc);
 
     let mut adc = dp.ADC.constrain(&mut rcc);
-    adc.set_sample_time(SampleTime::T_80);
-    adc.set_precision(Precision::B_12);
+    adc.set_sample_time(SampleTimeSelect::One, SampleTime::T79_5);
+    adc.set_precision(Precision::B12);
     adc.set_oversampling_ratio(OversamplingRatio::X_16);
     adc.set_oversampling_shift(16);
     adc.oversampling_enable(true);

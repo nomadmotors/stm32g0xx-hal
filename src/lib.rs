@@ -12,6 +12,7 @@ extern crate void;
 pub extern crate cortex_m;
 pub extern crate embedded_hal as hal;
 pub extern crate nb;
+pub extern crate proto_hal as proto;
 pub extern crate stm32g0;
 
 pub use nb::block;
@@ -59,6 +60,8 @@ pub mod spi;
 pub mod time;
 pub mod timer;
 pub mod watchdog;
+
+mod fmt;
 
 #[cfg(feature = "device-selected")]
 mod sealed {

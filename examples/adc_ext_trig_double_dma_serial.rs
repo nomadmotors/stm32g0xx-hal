@@ -25,7 +25,7 @@ use core::cell::RefCell;
 use cortex_m::interrupt::Mutex;
 
 use crate::hal::stm32::{interrupt, Interrupt};
-use hal::analog::adc::{InjTrigSource, Precision, SampleTime}; //, VTemp
+use hal::analog::adc::{InjTrigSource, Precision, SampleTime, SampleTimeSelect}; //, VTemp
 
 use hal::dma::{self, Channel, Target};
 
@@ -159,8 +159,8 @@ fn main() -> ! {
     // Set up adc
 
     let mut adc = dp.ADC.constrain(&mut rcc);
-    adc.set_sample_time(SampleTime::T_80);
-    adc.set_precision(Precision::B_12);
+    adc.set_sample_time(SampleTimeSelect::One, SampleTime::T79_5);
+    adc.set_precision(Precision::B12);
     let mut pa3 = gpioa.pa5.into_analog();
     let u_raw: u32 = adc.read(&mut pa3).expect("adc read failed");
     let u = u_raw.saturating_sub(32) as f32 / 4_096_f32 * 3.3;

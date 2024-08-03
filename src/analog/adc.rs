@@ -1,10 +1,11 @@
 //! # Analog to Digital converter
 use core::ptr;
 
-use crate::gpio::*;
 use crate::rcc::{Enable, Rcc};
 use crate::stm32::ADC;
+use crate::{fmt, gpio::*};
 use hal::adc::{Channel, OneShot};
+use proto::stm32::adc::AdcPin;
 
 /// ADC Result Alignment
 #[derive(Eq, PartialEq)]
@@ -26,39 +27,45 @@ pub enum Align {
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub enum Precision {
     /// 12 bit precision
-    B_12 = 0b00,
+    B12 = 0b00,
     /// 10 bit precision
-    B_10 = 0b01,
+    B10 = 0b01,
     /// 8 bit precision
-    B_8 = 0b10,
+    B8 = 0b10,
     /// 6 bit precision
-    B_6 = 0b11,
+    B6 = 0b11,
 }
 
 /// ADC Sampling time
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub enum SampleTime {
-    T_2 = 0b000,
-    T_4 = 0b001,
-    T_8 = 0b010,
-    T_12 = 0b011,
-    T_20 = 0b100,
-    T_40 = 0b101,
-    T_80 = 0b110,
-    T_160 = 0b111,
+    T1_5 = 0b000,
+    T3_5 = 0b001,
+    T7_5 = 0b010,
+    T12_5 = 0b011,
+    T19_5 = 0b100,
+    T39_5 = 0b101,
+    T79_5 = 0b110,
+    T160_5 = 0b111,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub enum SampleTimeSelect {
+    One,
+    Two,
 }
 
 // ADC Oversampling ratio
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub enum OversamplingRatio {
-    X_2 = 0b000,
-    X_4 = 0b001,
-    X_8 = 0b010,
-    X_16 = 0b011,
-    X_32 = 0b100,
-    X_64 = 0b101,
-    X_128 = 0b110,
-    X_256 = 0b111,
+    X2 = 0b000,
+    X4 = 0b001,
+    X8 = 0b010,
+    X16 = 0b011,
+    X32 = 0b100,
+    X64 = 0b101,
+    X128 = 0b110,
+    X256 = 0b111,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -69,41 +76,99 @@ pub enum ClockSource {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum PclkDiv {
-    PclkD1 = 3,
-    PclkD2 = 1,
-    PclkD4 = 2,
+    Div1 = 3,
+    Div2 = 1,
+    Div4 = 2,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum AsyncClockDiv {
-    AsyncD1 = 0,
-    AsyncD2 = 1,
-    AsyncD4 = 2,
-    AsyncD8 = 3,
-    AsyncD16 = 4,
-    AsyncD32 = 5,
-    AsyncD64 = 6,
-    AsyncD128 = 7,
-    AsyncD256 = 8,
+    Div1 = 0,
+    Div2 = 1,
+    Div4 = 2,
+    Div8 = 3,
+    Div16 = 4,
+    Div32 = 5,
+    Div64 = 6,
+    Div128 = 7,
+    Div256 = 8,
 }
 
 /// ADC injected trigger source selection
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub enum InjTrigSource {
-    TRG_0 = 0b000, // TIM1_TRGO2
-    TRG_1 = 0b001, // TIM1_CC4
-    TRG_2 = 0b010, // TIM2_TRGO
-    TRG_3 = 0b011, // TIM3_TRGO
-    TRG_4 = 0b100, // TIM15_TRGO
-    TRG_5 = 0b101, // TIM6_TRGO
-    TRG_6 = 0b110, // TIM4_TRGO
-    TRG_7 = 0b111, // EXTI11
+    /// Trigger 0
+    TIM1_TRGO2 = 0b000,
+    /// Trigger 1
+    TIM1_CC4 = 0b001,
+    /// Trigger 2
+    TIM2_TRGO = 0b010,
+    /// Trigger 3
+    TIM3_TRGO = 0b011,
+    /// Trigger 4
+    TIM15_TRGO = 0b100,
+    /// Trigger 5
+    TIM6_TRGO = 0b101,
+    /// Trigger 6
+    TIM4_TRGO = 0b110,
+    /// Trigger 7
+    EXTI11 = 0b111,
 }
+
+/// $RM0444 15.11 Table 77
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub enum Event {
+    /// End of calibration
+    EOCAL,
+    /// ADC ready
+    ADRDY,
+    /// End of conversion
+    EOC,
+    /// End of sequence
+    EOS,
+    /// Analog watchdog 1
+    AWD1,
+    /// Analog watchdog 2
+    AWD2,
+    /// Analog watchdog 3
+    AWD3,
+    /// Channel configuration ready
+    CCRDY,
+    /// End of sampling phase
+    EOSMP,
+    /// Overrun
+    OVR,
+}
+
+/*
+let sequence = (
+    pin1.as_sequence_item(SampleTimeSelect::One),
+    pin2.as_sequence_item(SampleTimeSelect::Two),
+    pin3.as_sequence_item(SampleTimeSelect::One),
+).into_basic_sequence(Direction::Forward);
+
+let mut conversion: Conversion<Continuous> = adc.create_conversion(sequence).into_continuous();
+conversion.start();
+loop {
+    let result = block!(conversion.get_all()).unwrap();
+}
+
+// on drop: conversion.stop();
+
+---
+
+let sequence = (pin.as_sequence_item(SampleTimeSelect::One),).into_basic_sequence(Direction::Forward);
+
+let mut conversion: Conversion<OneShot> = adc.create_conversion(sequence);
+conversion.start();
+
+block!(conversion.get());
+
+*/
 
 /// Analog to Digital converter interface
 pub struct Adc {
     rb: ADC,
-    sample_time: SampleTime,
     align: Align,
     precision: Precision,
     vref_cache: Option<u16>,
@@ -122,9 +187,8 @@ impl Adc {
 
         Self {
             rb: adc,
-            sample_time: SampleTime::T_2,
             align: Align::Right,
-            precision: Precision::B_12,
+            precision: Precision::B12,
             vref_cache: None,
         }
     }
@@ -181,8 +245,11 @@ impl Adc {
     }
 
     /// Set the Adc sampling time
-    pub fn set_sample_time(&mut self, t_samp: SampleTime) {
-        self.sample_time = t_samp;
+    pub fn set_sample_time(&mut self, mux: SampleTimeSelect, sample_time: SampleTime) {
+        self.rb.smpr.modify(|_, w| match mux {
+            SampleTimeSelect::One => unsafe { w.smp1().bits(sample_time as u8) },
+            SampleTimeSelect::Two => unsafe { w.smp2().bits(sample_time as u8) },
+        });
     }
 
     /// Set the Adc result alignment
@@ -267,6 +334,41 @@ impl Adc {
         }
     }
 
+    pub fn read_basic_sequence<const N: usize>(
+        &mut self,
+        sequence: BasicSequence<N>,
+    ) -> nb::Result<u16, ()> {
+        self.power_up();
+        // self.rb.cfgr1.modify(|_, w| unsafe {
+        //     w.res()
+        //         .bits(self.precision as u8)
+        //         .align()
+        //         .bit(self.align == Align::Left)
+        // });
+
+        // self.rb
+        //     .smpr
+        //     .modify(|_, w| unsafe { w.smp1().bits(self.sample_time as u8) });
+
+        // self.rb
+        //     .chselr()
+        //     .modify(|_, w| unsafe { w.chsel().bits(1 << PIN::channel()) });
+
+        // self.rb.isr.modify(|_, w| w.eos().set_bit());
+        // self.rb.cr.modify(|_, w| w.adstart().set_bit());
+        // while self.rb.isr.read().eos().bit_is_clear() {}
+
+        // let res = self.rb.dr.read().bits() as u16;
+        // let val = if self.align == Align::Left && self.precision == Precision::B_6 {
+        //     res << 8
+        // } else {
+        //     res
+        // };
+
+        self.power_down();
+        Ok(0)
+    }
+
     pub fn read_voltage<PIN: Channel<Adc, ID = u8>>(
         &mut self,
         pin: &mut PIN,
@@ -301,6 +403,83 @@ impl Adc {
         let t = 30 + (vtemp_voltage as i32 - v30 as i32) * 10 / 25;
 
         Ok(t as i16)
+    }
+
+    pub fn start_conversion<PIN>(&mut self, pin: &mut PIN)
+    where
+        PIN: AdcPin<Self, ID = u8>,
+    {
+        self.power_up();
+        self.rb
+            .chselr()
+            .modify(|_, w| unsafe { w.chsel().bits(1 << PIN::CHANNEL) });
+
+        fmt::trace!("chsel: {}", self.rb.chselr().read().bits());
+
+        self.rb.isr.modify(|_, w| w.eos().set_bit());
+        self.rb.cr.modify(|_, w| w.adstart().set_bit());
+    }
+
+    pub fn listen(&mut self, event: Event) {
+        self.rb.ier.modify(|_, w| match event {
+            Event::EOCAL => w.eocalie().set_bit(),
+            Event::ADRDY => w.adrdyie().set_bit(),
+            Event::EOC => w.eocie().set_bit(),
+            Event::EOS => w.eosie().set_bit(),
+            Event::AWD1 => w.awd1ie().set_bit(),
+            Event::AWD2 => w.awd2ie().set_bit(),
+            Event::AWD3 => w.awd3ie().set_bit(),
+            Event::CCRDY => w.ccrdyie().set_bit(),
+            Event::EOSMP => w.eosmpie().set_bit(),
+            Event::OVR => w.ovrie().set_bit(),
+        });
+    }
+
+    pub fn unlisten(&mut self, event: Event) {
+        self.rb.ier.modify(|_, w| match event {
+            Event::EOCAL => w.eocalie().clear_bit(),
+            Event::ADRDY => w.adrdyie().clear_bit(),
+            Event::EOC => w.eocie().clear_bit(),
+            Event::EOS => w.eosie().clear_bit(),
+            Event::AWD1 => w.awd1ie().clear_bit(),
+            Event::AWD2 => w.awd2ie().clear_bit(),
+            Event::AWD3 => w.awd3ie().clear_bit(),
+            Event::CCRDY => w.ccrdyie().clear_bit(),
+            Event::EOSMP => w.eosmpie().clear_bit(),
+            Event::OVR => w.ovrie().clear_bit(),
+        });
+    }
+
+    pub fn is_pending(&self, event: Event) -> bool {
+        let reg = self.rb.isr.read();
+
+        match event {
+            Event::EOCAL => reg.eocal().bit_is_set(),
+            Event::ADRDY => reg.adrdy().bit_is_set(),
+            Event::EOC => reg.eoc().bit_is_set(),
+            Event::EOS => reg.eos().bit_is_set(),
+            Event::AWD1 => reg.awd1().bit_is_set(),
+            Event::AWD2 => reg.awd2().bit_is_set(),
+            Event::AWD3 => reg.awd3().bit_is_set(),
+            Event::CCRDY => reg.ccrdy().bit_is_set(),
+            Event::EOSMP => reg.eosmp().bit_is_set(),
+            Event::OVR => reg.ovr().bit_is_set(),
+        }
+    }
+
+    pub fn unpend(&mut self, event: Event) {
+        self.rb.isr.modify(|_, w| match event {
+            Event::EOCAL => w.eocal().set_bit(),
+            Event::ADRDY => w.adrdy().set_bit(),
+            Event::EOC => w.eoc().set_bit(),
+            Event::EOS => w.eos().set_bit(),
+            Event::AWD1 => w.awd1().set_bit(),
+            Event::AWD2 => w.awd2().set_bit(),
+            Event::AWD3 => w.awd3().set_bit(),
+            Event::CCRDY => w.ccrdy().set_bit(),
+            Event::EOSMP => w.eosmp().set_bit(),
+            Event::OVR => w.ovr().set_bit(),
+        });
     }
 
     pub fn release(self) -> ADC {
@@ -357,9 +536,9 @@ where
 
         self.power_up();
 
-        self.rb
-            .smpr // set sampling time set 1 (ADSTART must be 0)
-            .modify(|_, w| unsafe { w.smp1().bits(self.sample_time as u8) });
+        // self.rb
+        //     .smpr // set sampling time set 1 (ADSTART must be 0)
+        //     .modify(|_, w| unsafe { w.smp1().bits(self.sample_time as u8) });
 
         self.rb
             .chselr() // set activ channel acording chapter 15.12.9 (ADC_CFGR1; CHSELRMOD=0)
@@ -371,7 +550,7 @@ pub trait DmaMode<ADC> {
     /// Error type returned by ADC methods
     type Error;
     fn dma_enable(&mut self, enable: bool);
-    fn dma_circualr_mode(&mut self, enable: bool);
+    fn dma_circular_mode(&mut self, enable: bool);
 }
 
 impl DmaMode<Adc> for Adc {
@@ -385,7 +564,7 @@ impl DmaMode<Adc> for Adc {
         }
     }
 
-    fn dma_circualr_mode(&mut self, enable: bool) {
+    fn dma_circular_mode(&mut self, enable: bool) {
         if enable {
             self.rb.cfgr1.modify(|_, w| w.dmacfg().set_bit()); // activate circular mode
         } else {
@@ -410,9 +589,9 @@ where
                 .bit(self.align == Align::Left)
         });
 
-        self.rb
-            .smpr
-            .modify(|_, w| unsafe { w.smp1().bits(self.sample_time as u8) });
+        // self.rb
+        //     .smpr
+        //     .modify(|_, w| unsafe { w.smp1().bits(self.sample_time as u8) });
 
         self.rb
             .chselr()
@@ -423,7 +602,7 @@ where
         while self.rb.isr.read().eos().bit_is_clear() {}
 
         let res = self.rb.dr.read().bits() as u16;
-        let val = if self.align == Align::Left && self.precision == Precision::B_6 {
+        let val = if self.align == Align::Left && self.precision == Precision::B6 {
             res << 8
         } else {
             res
@@ -488,6 +667,12 @@ macro_rules! adc_pin {
 
                 fn channel() -> u8 { $chan }
             }
+
+            // proto-hal
+            impl AdcPin<Adc> for $pin {
+                type ID = u8;
+                const CHANNEL: Self::ID = $chan;
+            }
         )+
     };
 }
@@ -523,3 +708,101 @@ adc_pin! {
     Channel17: (gpioc::PC4<Analog>, 17u8),
     Channel18: (gpioc::PC5<Analog>, 18u8),
 }
+
+pub enum Direction {
+    Forward,
+    Backward,
+}
+
+pub struct BasicSequence<const N: usize> {
+    channel_select: u32,
+    direction: Direction,
+}
+
+pub struct FullSequence<const N: usize> {
+    channels: [u8; N],
+}
+
+pub trait BasicSequencePins<const N: usize> {
+    fn into_basic_sequence(self, direction: Direction) -> BasicSequence<N>;
+}
+pub trait FullSequencePins<const N: usize> {
+    fn into_full_sequence(self) -> FullSequence<N>;
+}
+
+macro_rules! impl_basic_sequences {
+    ( $( ($N:expr, ( $($CH:ident),+ )) ),+ $(,)? ) => {
+        $(
+            impl<$( $CH ),+> BasicSequencePins<$N> for ($( &mut $CH ),+)
+            where
+                $(
+                    $CH: AdcPin<Adc, ID = u8>
+                ),+
+            {
+                fn into_basic_sequence(self, direction: Direction) -> BasicSequence<$N> {
+                    BasicSequence {
+                        channel_select: [ $( $CH::CHANNEL ),+ ].iter().fold(0, |partial, next| partial + (1 << next)),
+                        direction,
+                    }
+                }
+            }
+        )+
+    };
+}
+
+macro_rules! impl_full_sequences {
+    ( $( ($N:expr, ( $($CH:ident),+ )) ),+ $(,)? ) => {
+        $(
+            impl<$( $CH ),+> FullSequencePins<$N> for ($( &mut $CH ),+)
+            where
+                $(
+                    $CH: AdcPin<Adc, ID = u8>
+                ),+
+            {
+                fn into_full_sequence(self) -> FullSequence<$N> {
+                    FullSequence {
+                        channels: [ $($CH::CHANNEL),+ ]
+                    }
+                }
+            }
+        )+
+    };
+}
+
+// $RM0444 15.12.9 - There are up to 19 conversions in a basic configured sequence
+
+impl_basic_sequences!(
+    (2, (A, B)),
+    (3, (A, B, C)),
+    (4, (A, B, C, D)),
+    (5, (A, B, C, D, E)),
+    (6, (A, B, C, D, E, F)),
+    (7, (A, B, C, D, E, F, G)),
+    (8, (A, B, C, D, E, F, G, H)),
+    (9, (A, B, C, D, E, F, G, H, I)),
+    (10, (A, B, C, D, E, F, G, H, I, J)),
+    (11, (A, B, C, D, E, F, G, H, I, J, K)),
+    (12, (A, B, C, D, E, F, G, H, I, J, K, L)),
+    (13, (A, B, C, D, E, F, G, H, I, J, K, L, M)),
+    (14, (A, B, C, D, E, F, G, H, I, J, K, L, M, N)),
+    (15, (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O)),
+    (16, (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P)),
+    (17, (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q)),
+    (18, (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R)),
+    (
+        19,
+        (A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S)
+    ),
+);
+
+// $RM0444 15.12.10 - There are up to 8 conversions in a fully configured sequence
+
+impl_full_sequences!(
+    (2, (A, B)),
+    (3, (A, B, C)),
+    (4, (A, B, C, D)),
+    (5, (A, B, C, D, E)),
+    (6, (A, B, C, D, E, F)),
+    (7, (A, B, C, D, E, F, G)),
+    (8, (A, B, C, D, E, F, G, H)),
+);

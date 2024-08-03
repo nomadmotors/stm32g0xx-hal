@@ -167,7 +167,7 @@ pub enum Speed {
 pub enum SignalEdge {
     Rising,
     Falling,
-    All,
+    Any,
 }
 
 #[allow(dead_code)]
@@ -192,7 +192,7 @@ macro_rules! gpio {
             use core::marker::PhantomData;
             use hal::digital::v2::{toggleable, InputPin, OutputPin, StatefulOutputPin};
             use crate::stm32::{EXTI, $GPIOX};
-            use crate::exti::{ExtiExt, Event};
+            use crate::exti::{ExtiExt, ExtiPin, Event};
             use crate::rcc::{Enable, Rcc};
             use super::*;
 
@@ -438,39 +438,6 @@ macro_rules! gpio {
                         $PXi { _mode: PhantomData }
                     }
 
-                    /// Configures the pin as external trigger
-                    pub fn listen(self, edge: SignalEdge, exti: &mut EXTI) -> $PXi<Input<Floating>> {
-                        let offset = 2 * $i;
-                        unsafe {
-                            let _ = &(*$GPIOX::ptr()).pupdr.modify(|r, w| {
-                                w.bits(r.bits() & !(0b11 << offset))
-                            });
-                            let _ = &(*$GPIOX::ptr()).moder.modify(|r, w| {
-                                w.bits(r.bits() & !(0b11 << offset))
-                            });
-                        };
-                        let offset = ($i % 4) * 8;
-                        let mask = $Pxn << offset;
-                        let reset = !(0xff << offset);
-                        match $i as u8 {
-                            0..=3   => exti.exticr1.modify(|r, w| unsafe {
-                                w.bits(r.bits() & reset | mask)
-                            }),
-                            4..=7  => exti.exticr2.modify(|r, w| unsafe {
-                                w.bits(r.bits() & reset | mask)
-                            }),
-                            8..=11 => exti.exticr3.modify(|r, w| unsafe {
-                                w.bits(r.bits() & reset | mask)
-                            }),
-                            12..=16 => exti.exticr4.modify(|r, w| unsafe {
-                                w.bits(r.bits() & reset | mask)
-                            }),
-                            _ => unreachable!(),
-                        }
-                        exti.listen(Event::from_code($i), edge);
-                        $PXi { _mode: PhantomData }
-                    }
-
                     /// Set pin speed
                     pub fn set_speed(self, speed: Speed) -> Self {
                         let offset = 2 * $i;
@@ -598,10 +565,50 @@ macro_rules! gpio {
                         Ok(is_low)
                     }
                 }
+
+                impl<MODE> ExtiPin for $PXi<Input<MODE>> {
+                    type Output = $PXi<Input<Floating>>;
+
+                    fn listen(self, edge: SignalEdge, exti: &mut EXTI) -> Self::Output {
+                        let offset = 2 * $i;
+                        unsafe {
+                            let _ = &(*$GPIOX::ptr()).pupdr.modify(|r, w| {
+                                w.bits(r.bits() & !(0b11 << offset))
+                            });
+                            let _ = &(*$GPIOX::ptr()).moder.modify(|r, w| {
+                                w.bits(r.bits() & !(0b11 << offset))
+                            });
+                        };
+                        let offset = ($i % 4) * 8;
+                        let mask = $Pxn << offset;
+                        let reset = !(0xff << offset);
+                        match $i as u8 {
+                            0..=3   => exti.exticr1.modify(|r, w| unsafe {
+                                w.bits(r.bits() & reset | mask)
+                            }),
+                            4..=7  => exti.exticr2.modify(|r, w| unsafe {
+                                w.bits(r.bits() & reset | mask)
+                            }),
+                            8..=11 => exti.exticr3.modify(|r, w| unsafe {
+                                w.bits(r.bits() & reset | mask)
+                            }),
+                            12..=16 => exti.exticr4.modify(|r, w| unsafe {
+                                w.bits(r.bits() & reset | mask)
+                            }),
+                            _ => unreachable!(),
+                        }
+                        exti.listen(Event::from_code($i), edge);
+                        $PXi { _mode: PhantomData }
+                    }
+
+                    fn event(&self) -> Event {
+                        Event::from_code($i)
+                    }
+                }
             )+
 
             impl<TYPE> $PXx<TYPE> {
-                pub fn get_id (&self) -> u8 {
+                fn get_id(&self) -> u8 {
                     self.i
                 }
             }

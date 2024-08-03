@@ -43,8 +43,8 @@ impl Power {
         self.rb.sr1.read().sbf().bit_is_set()
     }
 
-    pub fn get_wakeup_flag<L: Into<WakeUp>>(&self, lane: L) -> bool {
-        match lane.into() {
+    pub fn get_wakeup_flag<P: WakeupPin>(&self, _pin: &P) -> bool {
+        match P::LANE {
             WakeUp::Line1 => self.rb.sr1.read().wuf1().bit_is_set(),
             WakeUp::Line2 => self.rb.sr1.read().wuf2().bit_is_set(),
             WakeUp::Line4 => self.rb.sr1.read().wuf4().bit_is_set(),
@@ -54,8 +54,8 @@ impl Power {
         }
     }
 
-    pub fn clear_wakeup_flag<L: Into<WakeUp>>(&mut self, lane: L) {
-        match lane.into() {
+    pub fn clear_wakeup_flag<P: WakeupPin>(&mut self, _pin: &P) {
+        match P::LANE {
             WakeUp::Line1 => self.rb.scr.write(|w| w.cwuf1().set_bit()),
             WakeUp::Line2 => self.rb.scr.write(|w| w.cwuf2().set_bit()),
             WakeUp::Line4 => self.rb.scr.write(|w| w.cwuf4().set_bit()),
@@ -71,11 +71,11 @@ impl Power {
         }
     }
 
-    pub fn enable_wakeup_lane<L: Into<WakeUp>>(&mut self, lane: L, edge: SignalEdge) {
-        assert!(edge != SignalEdge::All);
+    pub fn enable_wakeup_lane<P: WakeupPin>(&mut self, _pin: &P, edge: SignalEdge) {
+        assert!(edge != SignalEdge::Any);
 
         let edge = edge == SignalEdge::Falling;
-        match lane.into() {
+        match P::LANE {
             WakeUp::Line1 => {
                 self.rb.cr3.modify(|_, w| w.ewup1().set_bit());
                 self.rb.cr4.modify(|_, w| w.wp1().bit(edge));
@@ -100,8 +100,8 @@ impl Power {
         }
     }
 
-    pub fn disable_wakeup_lane<L: Into<WakeUp>>(&mut self, lane: L) {
-        match lane.into() {
+    pub fn disable_wakeup_lane<P: WakeupPin>(&mut self, _pin: &P) {
+        match P::LANE {
             WakeUp::Line1 => self.rb.cr3.modify(|_, w| w.ewup1().clear_bit()),
             WakeUp::Line2 => self.rb.cr3.modify(|_, w| w.ewup2().clear_bit()),
             WakeUp::Line4 => self.rb.cr3.modify(|_, w| w.ewup4().clear_bit()),
@@ -122,42 +122,45 @@ impl Power {
                 self.rb
                     .cr1
                     .modify(|_, w| unsafe { w.lpr().set_bit().lpms().bits(sm as u8) });
-                while !self.rb.sr2.read().reglps().bit_is_set()
-                    || !self.rb.sr2.read().reglpf().bit_is_set()
-                {}
+                // while !self.rb.sr2.read().reglps().bit_is_set()
+                //     || !self.rb.sr2.read().reglpf().bit_is_set()
+                // {}
+                self.rb.cr1.read(); // maybe unnecessary
             }
             PowerMode::UltraLowPower(sm) => {
                 self.rb.cr3.modify(|_, w| w.ulpen().set_bit());
                 self.rb
                     .cr1
                     .modify(|_, w| unsafe { w.lpr().set_bit().lpms().bits(sm as u8) });
-                while !self.rb.sr2.read().reglps().bit_is_set()
-                    || !self.rb.sr2.read().reglpf().bit_is_set()
-                {}
+                // while !self.rb.sr2.read().reglps().bit_is_set()
+                //     || !self.rb.sr2.read().reglpf().bit_is_set()
+                // {}
             }
         }
     }
 }
 
+pub trait WakeupPin {
+    const LANE: WakeUp;
+}
+
 macro_rules! wakeup_pins {
-    ($($PIN:path: $line:expr,)+) => {
+    ($($PXi:ident: $LANE:expr,)+) => {
         $(
-            impl<M> From<&$PIN> for WakeUp {
-                fn from(_: &$PIN) -> Self {
-                    $line
-                 }
+            impl WakeupPin for $PXi<Input<Floating>> {
+                const LANE: WakeUp = $LANE;
             }
         )+
     }
 }
 
 wakeup_pins! {
-    PA0<M>: WakeUp::Line1,
-    PA4<M>: WakeUp::Line2,
-    PC13<M>: WakeUp::Line2,
-    PA2<M>: WakeUp::Line4,
-    PC5<M>: WakeUp::Line5,
-    PB5<M>: WakeUp::Line6,
+    PA0: WakeUp::Line1,
+    PA4: WakeUp::Line2,
+    PC13: WakeUp::Line2,
+    PA2: WakeUp::Line4,
+    PC5: WakeUp::Line5,
+    PB5: WakeUp::Line6,
 }
 
 pub trait PowerExt {
